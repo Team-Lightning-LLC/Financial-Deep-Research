@@ -12,7 +12,7 @@ class DeepResearchApp {
   async init() {
     this.setupEventListeners();
     await this.loadDocuments();
-    this.renderDocuments();
+    this.filterAndRenderDocuments();
     console.log('Deep Research Agent initialized');
   }
 
@@ -219,7 +219,7 @@ class DeepResearchApp {
     await researchEngine.startResearch(researchData);
   }
 
-  // Load documents from API - using direct fetch like your working example
+  // Load documents from API - with detailed debugging
   async loadDocuments() {
     try {
       console.log('Loading documents...');
@@ -240,24 +240,51 @@ class DeepResearchApp {
       const allObjects = await response.json();
       console.log('Loaded objects:', allObjects.length);
       
+      // Debug: Show first few object names
+      console.log('First 5 object names:', allObjects.slice(0, 5).map(obj => obj.name));
+      
       // Filter for documents containing "Deep Research" in any format
       const researchDocs = allObjects.filter(obj => {
-        if (!obj.name) return false;
-        const name = obj.name.toLowerCase();
-        const hasDeepResearch = name.includes('deep') && name.includes('research');
-        if (hasDeepResearch) {
-          console.log('Found research doc:', obj.name);
+        if (!obj.name) {
+          console.log('Object without name:', obj.id);
+          return false;
         }
+        
+        const name = obj.name.toLowerCase();
+        const hasDeep = name.includes('deep');
+        const hasResearch = name.includes('research');
+        const hasDeepResearch = hasDeep && hasResearch;
+        
+        console.log(`Checking "${obj.name}":`, {
+          hasDeep,
+          hasResearch,
+          hasDeepResearch,
+          status: obj.status
+        });
+        
         return hasDeepResearch;
       });
       
       console.log('Filtered research docs:', researchDocs.length);
+      researchDocs.forEach(doc => console.log('  - Found:', doc.name));
       
-      this.documents = researchDocs
-        .map(obj => this.transformDocument(obj))
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      // Transform each document
+      this.documents = [];
+      for (const obj of researchDocs) {
+        try {
+          const transformed = this.transformDocument(obj);
+          this.documents.push(transformed);
+          console.log('Transformed:', transformed.title);
+        } catch (error) {
+          console.error('Failed to transform:', obj.name, error);
+        }
+      }
       
-      console.log('Transformed documents:', this.documents.length);
+      // Sort by date
+      this.documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      console.log('Final documents array:', this.documents.length);
+      console.log('Document titles:', this.documents.map(d => d.title));
       
     } catch (error) {
       console.error('Failed to load documents:', error);
@@ -273,7 +300,7 @@ class DeepResearchApp {
     let title = obj.name || 'Untitled';
     
     // Remove common prefixes
-    const prefixes = ['DeepResearch_', 'Deep Research_', 'deep research_', 'DEEP RESEARCH_'];
+    const prefixes = ['DeepResearch_', 'Deep Research_', 'deep research_', 'DEEP RESEARCH_', 'DEEP RESEARCH:'];
     prefixes.forEach(prefix => {
       if (title.startsWith(prefix)) {
         title = title.substring(prefix.length);
@@ -281,7 +308,7 @@ class DeepResearchApp {
     });
     
     // Replace underscores and hyphens with spaces
-    title = title.replace(/[_-]/g, ' ');
+    title = title.replace(/[_-]/g, ' ').trim();
     
     // Try to extract area/topic from the name or properties
     const nameParts = title.toLowerCase().split(' ');
@@ -324,7 +351,7 @@ class DeepResearchApp {
       when: this.formatDate(obj.created_at || obj.properties?.generated_at)
     };
     
-    console.log('Transformed:', transformed);
+    console.log('Transformed result:', transformed);
     return transformed;
   }
 
@@ -346,6 +373,12 @@ class DeepResearchApp {
 
   // Filter and render documents
   filterAndRenderDocuments() {
+    console.log('Filtering documents:', {
+      totalDocs: this.documents.length,
+      currentFilter: this.currentFilter,
+      searchQuery: this.searchQuery
+    });
+    
     this.filteredDocuments = this.documents.filter(doc => {
       // Filter by category
       const matchesFilter = this.currentFilter === 'All' || doc.area === this.currentFilter;
@@ -356,8 +389,21 @@ class DeepResearchApp {
           field && field.toLowerCase().includes(this.searchQuery)
         );
       
-      return matchesFilter && matchesSearch;
+      const passes = matchesFilter && matchesSearch;
+      
+      if (!passes) {
+        console.log(`Filtered out "${doc.title}":`, {
+          matchesFilter,
+          matchesSearch,
+          area: doc.area,
+          currentFilter: this.currentFilter
+        });
+      }
+      
+      return passes;
     });
+    
+    console.log('After filtering:', this.filteredDocuments.length, 'documents remain');
     
     this.renderDocuments();
   }
@@ -365,29 +411,42 @@ class DeepResearchApp {
   // Render document list
   renderDocuments() {
     const docsPane = document.getElementById('docsPane');
-    if (!docsPane) return;
+    if (!docsPane) {
+      console.error('docsPane element not found');
+      return;
+    }
     
-    console.log('Rendering documents:', this.filteredDocuments.length);
+    console.log('Rendering documents:', {
+      totalDocs: this.documents.length,
+      filteredDocs: this.filteredDocuments.length,
+      currentFilter: this.currentFilter,
+      searchQuery: this.searchQuery
+    });
     
     if (this.filteredDocuments.length === 0) {
+      console.log('No documents to show');
       docsPane.innerHTML = '<div class="empty">No documents match your filters.</div>';
       return;
     }
     
-    const html = this.filteredDocuments.map(doc => `
-      <div class="doc" data-doc-id="${doc.id}">
-        <div class="doc-info">
-          <div class="tt">${doc.title}</div>
-          <div class="meta">${doc.when} • ${doc.area} • ${doc.topic} • ${doc.pages} pages</div>
+    const html = this.filteredDocuments.map(doc => {
+      console.log('Rendering doc:', doc.title);
+      return `
+        <div class="doc" data-doc-id="${doc.id}">
+          <div class="doc-info">
+            <div class="tt">${doc.title}</div>
+            <div class="meta">${doc.when} • ${doc.area} • ${doc.topic} • ${doc.pages} pages</div>
+          </div>
+          <div class="actions">
+            <button class="doc-action view-action">view</button>
+            <button class="doc-action delete-action">delete</button>
+          </div>
         </div>
-        <div class="actions">
-          <button class="doc-action view-action">view</button>
-          <button class="doc-action delete-action">delete</button>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     
     docsPane.innerHTML = html;
+    console.log('Rendered HTML to DOM');
   }
 
   // View document
