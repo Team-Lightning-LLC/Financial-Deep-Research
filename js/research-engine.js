@@ -20,12 +20,9 @@ class ResearchEngine {
       // Build research prompt
       const prompt = this.buildResearchPrompt(researchData);
       
-      // Execute async research
+      // Execute async research - only send Task
       const jobResponse = await vertesiaAPI.executeAsync({
-        Task: prompt,
-        research_area: researchData.area,
-        research_topic: researchData.topic,
-        research_parameters: researchData.params
+        Task: prompt
       });
 
       this.currentJob = {
@@ -53,13 +50,7 @@ class ResearchEngine {
 
   // Build research prompt from parameters
   buildResearchPrompt(researchData) {
-    const contexts = [
-      researchData.params.depth,
-      researchData.params.rigor,
-      researchData.params.focus
-    ];
-    
-    return `${researchData.topic}: ${contexts.join(', ')}`;
+    return `${researchData.topic}: Depth - ${researchData.params.depth}, Rigor - ${researchData.params.rigor}, Focus - ${researchData.params.focus}`;
   }
 
   // Show generation progress toast
