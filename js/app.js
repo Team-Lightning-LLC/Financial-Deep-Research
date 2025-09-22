@@ -219,72 +219,118 @@ class DeepResearchApp {
     await researchEngine.startResearch(researchData);
   }
 
- // Load documents from API
-async loadDocuments() {
-  try {
-    // Try server-side filtering first
-    let objects = [];
-    
-    // Search for common variations of "Deep Research"
-    const searchTerms = ['Deep Research', 'DeepResearch', 'deep research', 'DEEP RESEARCH'];
-    
-    for (const term of searchTerms) {
-      try {
-        const results = await vertesiaAPI.loadObjectsByName(term);
-        objects = objects.concat(results);
-      } catch (error) {
-        console.log(`No results for term: ${term}`);
-      }
-    }
-    
-    // Remove duplicates based on ID
-    const uniqueObjects = objects.filter((obj, index, self) => 
-      index === self.findIndex(o => o.id === obj.id)
-    );
-    
-    this.documents = uniqueObjects
-      .map(obj => this.transformDocument(obj))
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    
-  } catch (error) {
-    console.error('Failed to load documents:', error);
-    // Fallback to loading all objects if server-side filtering fails
+  // Load documents from API - using direct fetch like your working example
+  async loadDocuments() {
     try {
-      const allObjects = await vertesiaAPI.loadAllObjects();
-      this.documents = allObjects
-        .filter(obj => {
-          const name = (obj.name || '').toLowerCase();
-          return name.includes('deep') && name.includes('research');
-        })
+      console.log('Loading documents...');
+      
+      // Direct API call like your working example
+      const response = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects?limit=1000&offset=0`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const allObjects = await response.json();
+      console.log('Loaded objects:', allObjects.length);
+      
+      // Filter for documents containing "Deep Research" in any format
+      const researchDocs = allObjects.filter(obj => {
+        if (!obj.name) return false;
+        const name = obj.name.toLowerCase();
+        const hasDeepResearch = name.includes('deep') && name.includes('research');
+        if (hasDeepResearch) {
+          console.log('Found research doc:', obj.name);
+        }
+        return hasDeepResearch;
+      });
+      
+      console.log('Filtered research docs:', researchDocs.length);
+      
+      this.documents = researchDocs
         .map(obj => this.transformDocument(obj))
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    } catch (fallbackError) {
-      console.error('Fallback loading also failed:', fallbackError);
+      
+      console.log('Transformed documents:', this.documents.length);
+      
+    } catch (error) {
+      console.error('Failed to load documents:', error);
       this.documents = [];
     }
   }
-}
 
   // Transform API object to document format
   transformDocument(obj) {
-    // Extract metadata from name or properties
-    const nameParts = obj.name.replace(CONFIG.DOCUMENTS.PREFIX, '').split('_');
+    console.log('Transforming document:', obj.name);
     
-    return {
+    // Clean up the title - remove common prefixes and make readable
+    let title = obj.name || 'Untitled';
+    
+    // Remove common prefixes
+    const prefixes = ['DeepResearch_', 'Deep Research_', 'deep research_', 'DEEP RESEARCH_'];
+    prefixes.forEach(prefix => {
+      if (title.startsWith(prefix)) {
+        title = title.substring(prefix.length);
+      }
+    });
+    
+    // Replace underscores and hyphens with spaces
+    title = title.replace(/[_-]/g, ' ');
+    
+    // Try to extract area/topic from the name or properties
+    const nameParts = title.toLowerCase().split(' ');
+    let area = 'Unknown';
+    let topic = 'Unknown';
+    
+    // Check if name contains known areas/topics
+    const areas = Object.keys(CONFIG.RESEARCH_TOPICS);
+    for (const areaName of areas) {
+      if (title.toLowerCase().includes(areaName.toLowerCase())) {
+        area = areaName;
+        break;
+      }
+    }
+    
+    // Check for specific topics
+    for (const [areaName, topics] of Object.entries(CONFIG.RESEARCH_TOPICS)) {
+      for (const topicName of topics) {
+        if (title.toLowerCase().includes(topicName.toLowerCase())) {
+          area = areaName;
+          topic = topicName;
+          break;
+        }
+      }
+      if (topic !== 'Unknown') break;
+    }
+    
+    // Use properties if available
+    area = obj.properties?.research_area || area;
+    topic = obj.properties?.research_topic || topic;
+    
+    const transformed = {
       id: obj.id,
-      title: obj.name.replace(CONFIG.DOCUMENTS.PREFIX, '').replace(/_/g, ' '),
-      area: obj.properties?.research_area || nameParts[0] || 'Unknown',
-      topic: obj.properties?.research_topic || nameParts[1] || 'Unknown',
-      created_at: obj.created_at || obj.properties?.generated_at,
+      title: title,
+      area: area,
+      topic: topic,
+      created_at: obj.created_at || obj.properties?.generated_at || new Date().toISOString(),
       content_source: obj.content?.source,
-      pages: obj.properties?.page_count || Math.floor(Math.random() * 15) + 5, // Estimate
+      pages: obj.properties?.page_count || Math.floor(Math.random() * 15) + 5,
       when: this.formatDate(obj.created_at || obj.properties?.generated_at)
     };
+    
+    console.log('Transformed:', transformed);
+    return transformed;
   }
 
   // Format date for display
   formatDate(dateString) {
-    if (!dateString) return 'Unknown';
+    if (!dateString) return 'Recent';
     
     try {
       const date = new Date(dateString);
@@ -294,7 +340,7 @@ async loadDocuments() {
         year: 'numeric' 
       });
     } catch {
-      return 'Unknown';
+      return 'Recent';
     }
   }
 
@@ -307,7 +353,7 @@ async loadDocuments() {
       // Filter by search query
       const matchesSearch = !this.searchQuery || 
         [doc.title, doc.area, doc.topic].some(field => 
-          field.toLowerCase().includes(this.searchQuery)
+          field && field.toLowerCase().includes(this.searchQuery)
         );
       
       return matchesFilter && matchesSearch;
@@ -320,6 +366,8 @@ async loadDocuments() {
   renderDocuments() {
     const docsPane = document.getElementById('docsPane');
     if (!docsPane) return;
+    
+    console.log('Rendering documents:', this.filteredDocuments.length);
     
     if (this.filteredDocuments.length === 0) {
       docsPane.innerHTML = '<div class="empty">No documents match your filters.</div>';
@@ -348,8 +396,34 @@ async loadDocuments() {
       const doc = this.documents.find(d => d.id === docId);
       if (!doc) return;
       
-      // Get document content
-      const content = await vertesiaAPI.getFileContent(doc.content_source);
+      console.log('Viewing document:', doc.title, 'Source:', doc.content_source);
+      
+      // Get document content using the same pattern as your working code
+      const downloadResponse = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects/download-url`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          file: doc.content_source,
+          format: 'original'
+        })
+      });
+      
+      if (!downloadResponse.ok) {
+        throw new Error(`Failed to get download URL: ${downloadResponse.statusText}`);
+      }
+      
+      const downloadData = await downloadResponse.json();
+      
+      // Fetch the actual content
+      const contentResponse = await fetch(downloadData.url);
+      if (!contentResponse.ok) {
+        throw new Error(`Failed to download content: ${contentResponse.statusText}`);
+      }
+      
+      const content = await contentResponse.text();
       
       // Open in markdown viewer
       markdownViewer.openViewer(content, doc.title);
@@ -365,7 +439,17 @@ async loadDocuments() {
     if (!confirm('Are you sure you want to delete this document?')) return;
     
     try {
-      await vertesiaAPI.deleteObject(docId);
+      const response = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects/${docId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete: ${response.statusText}`);
+      }
+      
       await this.refreshDocuments();
     } catch (error) {
       console.error('Failed to delete document:', error);
