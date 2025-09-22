@@ -2,12 +2,12 @@
 const CONFIG = {
   // Vertesia API Configuration
   VERTESIA_API_BASE: 'https://api.vertesia.io/api/v1',
-  VERTESIA_API_KEY: 'sk-2538a58567e4ebb6654c0a17ceab228c',
+  VERTESIA_API_KEY: 'sk-544583102491bf69b0351418bbdd2aa9',
   ENVIRONMENT_ID: '681915c6a01fb262a410c161',
   MODEL: 'publishers/anthropic/models/claude-3-7-sonnet',
   
   // Research Agent Configuration
-  INTERACTION_NAME: 'AGENTAdvisorDeepResearch',
+  INTERACTION_NAME: 'AgentAdvisorDeepResearch',
   
   // Research Topics by Area
   RESEARCH_TOPICS: {
