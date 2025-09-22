@@ -222,23 +222,46 @@ class DeepResearchApp {
  // Load documents from API
 async loadDocuments() {
   try {
-    const objects = await vertesiaAPI.loadAllObjects();
+    // Try server-side filtering first
+    let objects = [];
     
-    // Filter for research documents - very flexible matching
-    this.documents = objects
-      .filter(obj => {
-        const name = (obj.name || '').toLowerCase();
-        // Check if both "deep" and "research" appear anywhere in the name
-        const hasDeep = name.includes('deep');
-        const hasResearch = name.includes('research');
-        return hasDeep && hasResearch;
-      })
+    // Search for common variations of "Deep Research"
+    const searchTerms = ['Deep Research', 'DeepResearch', 'deep research', 'DEEP RESEARCH'];
+    
+    for (const term of searchTerms) {
+      try {
+        const results = await vertesiaAPI.loadObjectsByName(term);
+        objects = objects.concat(results);
+      } catch (error) {
+        console.log(`No results for term: ${term}`);
+      }
+    }
+    
+    // Remove duplicates based on ID
+    const uniqueObjects = objects.filter((obj, index, self) => 
+      index === self.findIndex(o => o.id === obj.id)
+    );
+    
+    this.documents = uniqueObjects
       .map(obj => this.transformDocument(obj))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
   } catch (error) {
     console.error('Failed to load documents:', error);
-    this.documents = [];
+    // Fallback to loading all objects if server-side filtering fails
+    try {
+      const allObjects = await vertesiaAPI.loadAllObjects();
+      this.documents = allObjects
+        .filter(obj => {
+          const name = (obj.name || '').toLowerCase();
+          return name.includes('deep') && name.includes('research');
+        })
+        .map(obj => this.transformDocument(obj))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } catch (fallbackError) {
+      console.error('Fallback loading also failed:', fallbackError);
+      this.documents = [];
+    }
   }
 }
 
