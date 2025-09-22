@@ -1,0 +1,158 @@
+## index.html
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Deep Research Agent</title>
+<link rel="stylesheet" href="css/styles.css">
+<!-- Required libraries for markdown processing -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-section">
+      <div class="logo">DG</div>
+      <div class="brand-info">
+        <h1>DocuGen</h1>
+        <div class="subtitle">By Doculabs</div>
+      </div>
+    </div>
+    <h1 class="header-title">Deep Research</h1>
+  </div>
+
+  <!-- Secondary Nav -->
+  <nav class="secondary-nav">
+    <div class="secondary-links">
+      <div class="secondary-link">Dashboard</div>
+      <div class="secondary-link">Advisor</div>
+      <div class="secondary-link">Research</div>
+      <div class="secondary-link">Chat</div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="research-banner">
+    <h2>AI-Powered Research Generation</h2>
+  </header>
+
+  <!-- Shell -->
+  <section class="shell">
+    <!-- Left: Documents -->
+    <aside class="left">
+      <div class="panel-head">
+        <span class="panel-title">Research Library</span>
+        <div class="filters">
+          <button class="chip active" data-filter="All">All</button>
+          <button class="chip" data-filter="Markets">Markets</button>
+          <button class="chip" data-filter="Sectors">Sectors</button>
+          <button class="chip" data-filter="Assets">Assets</button>
+        </div>
+      </div>
+      <div class="left-body">
+        <div class="searchBox" style="padding:0 0 12px 0">
+          <input id="docSearch" placeholder="Search documents…"/>
+        </div>
+        <div id="docsPane">
+          <div class="empty">Loading your research library...</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right: Generation -->
+    <main class="right">
+      <div class="panel-head"><span class="panel-title" id="centerTitle">Create Research</span></div>
+      <div class="console">
+        <div class="section">
+          <h3>Research Area & Topic</h3>
+          <div class="row">
+            <div class="field">
+              <select id="area">
+                <option value="" selected>Select area…</option>
+                <option value="Markets">Markets</option>
+                <option value="Sectors">Sectors</option>
+                <option value="Assets">Assets</option>
+                <option value="Concepts">Concepts</option>
+              </select>
+            </div>
+            <div class="field">
+              <select id="narrow" disabled>
+                <option value="">Choose a topic…</option>
+              </select>
+            </div>
+            <button class="btn primary" id="createBtn" disabled>Generate</button>
+          </div>
+          <div class="hint" style="margin-top:6px"></div>
+        </div>
+
+        <!-- Research Parameters -->
+        <div class="section ctx-compact" id="ctxSection">
+          <div class="ctx-head"><h3>Research Parameters</h3></div>
+          <div class="ctx-grid">
+            <div class="ctx-block">
+              <div class="ctx-label">Depth</div>
+              <div class="seg" role="radiogroup" aria-label="Depth">
+                <button type="button" class="seg-option is-active" data-group="depth" data-value="High-Level">High-Level</button>
+                <button type="button" class="seg-option" data-group="depth" data-value="Focused">Focused</button>
+                <button type="button" class="seg-option" data-group="depth" data-value="Comprehensive">Comprehensive</button>
+              </div>
+            </div>
+            <div class="ctx-block">
+              <div class="ctx-label">Rigor</div>
+              <div class="seg" role="radiogroup" aria-label="Rigor">
+                <button type="button" class="seg-option" data-group="rigor" data-value="Essential Points">Essential</button>
+                <button type="button" class="seg-option is-active" data-group="rigor" data-value="Detailed Analysis">Detailed</button>
+                <button type="button" class="seg-option" data-group="rigor" data-value="Exhaustive Research">Exhaustive</button>
+              </div>
+            </div>
+            <div class="ctx-block">
+              <div class="ctx-label">Focus</div>
+              <div class="seg" role="radiogroup" aria-label="Focus">
+                <button type="button" class="seg-option is-active" data-group="focus" data-value="Investment Research">Investment</button>
+                <button type="button" class="seg-option" data-group="focus" data-value="Educational Summary">Educational</button>
+                <button type="button" class="seg-option" data-group="focus" data-value="Technical Analysis">Technical</button>
+              </div>
+            </div>
+          </div>
+          <div id="ctxSummary" class="ctx-summary">High-Level • Detailed • Investment</div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+<!-- Generation Progress Toast -->
+<div id="generationToast" class="toast-notification">
+  <div class="toast-content">
+    <div class="toast-spinner"></div>
+    <div class="toast-text">
+      <div class="toast-title">Generating Research...</div>
+      <div class="toast-subtitle">Estimated time: <span id="timeRemaining">5:00</span></div>
+    </div>
+    <button class="toast-close" id="toastClose">×</button>
+  </div>
+</div>
+
+<!-- Document Viewer Modal -->
+<dialog id="viewer" aria-label="Document viewer">
+  <div class="viewer-head">
+    <div class="viewer-title" id="viewerTitle">Document</div>
+    <div class="viewer-actions">
+      <button type="button" class="viewer-btn" id="downloadPDF">Download PDF</button>
+      <button type="button" class="viewer-close" id="closeViewer">Close</button>
+    </div>
+  </div>
+  <div id="viewerFrame" class="viewer-content"></div>
+</dialog>
+
+<!-- Application Scripts -->
+<script src="js/config.js"></script>
+<script src="js/vertesia-api.js"></script>
+<script src="js/markdown-viewer.js"></script>
+<script src="js/research-engine.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
