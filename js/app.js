@@ -219,22 +219,28 @@ class DeepResearchApp {
     await researchEngine.startResearch(researchData);
   }
 
-  // Load documents from API
-  async loadDocuments() {
-    try {
-      const objects = await vertesiaAPI.loadAllObjects();
-      
-      // Filter for research documents
-      this.documents = objects
-        .filter(obj => obj.name?.includes(CONFIG.DOCUMENTS.PREFIX))
-        .map(obj => this.transformDocument(obj))
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      
-    } catch (error) {
-      console.error('Failed to load documents:', error);
-      this.documents = [];
-    }
+ // Load documents from API
+async loadDocuments() {
+  try {
+    const objects = await vertesiaAPI.loadAllObjects();
+    
+    // Filter for research documents - very flexible matching
+    this.documents = objects
+      .filter(obj => {
+        const name = (obj.name || '').toLowerCase();
+        // Check if both "deep" and "research" appear anywhere in the name
+        const hasDeep = name.includes('deep');
+        const hasResearch = name.includes('research');
+        return hasDeep && hasResearch;
+      })
+      .map(obj => this.transformDocument(obj))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+  } catch (error) {
+    console.error('Failed to load documents:', error);
+    this.documents = [];
   }
+}
 
   // Transform API object to document format
   transformDocument(obj) {
