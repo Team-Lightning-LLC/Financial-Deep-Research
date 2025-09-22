@@ -22,7 +22,7 @@ class ResearchEngine {
       
       // Execute async research - only send Task
       const jobResponse = await vertesiaAPI.executeAsync({
-        ResearchTopic: prompt
+        Task: prompt
       });
 
       this.currentJob = {
