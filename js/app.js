@@ -221,10 +221,10 @@ class DeepResearchApp {
     await researchEngine.startResearch(researchData);
   }
 
-  // Load documents from API - with detailed debugging
+  // Load all documents from API - no filtering
   async loadDocuments() {
     try {
-      console.log('Loading documents...');
+      console.log('Loading all documents...');
       
       // Direct API call
       const response = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects?limit=1000&offset=0`, {
@@ -240,50 +240,29 @@ class DeepResearchApp {
       }
       
       const allObjects = await response.json();
-      console.log('Loaded objects:', allObjects.length);
+      console.log('Loaded all objects:', allObjects.length);
       
-// Load all documents from API - no filtering
-async loadDocuments() {
-  try {
-    console.log('Loading all documents...');
-    
-    // Direct API call
-    const response = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects?limit=1000&offset=0`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
-        'Content-Type': 'application/json'
+      // Transform each document without filtering
+      this.documents = [];
+      for (const obj of allObjects) {
+        try {
+          const transformed = this.transformDocument(obj);
+          this.documents.push(transformed);
+        } catch (error) {
+          console.error('Failed to transform:', obj.name, error);
+        }
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      
+      // Sort by date
+      this.documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      console.log('Final documents array:', this.documents.length);
+      
+    } catch (error) {
+      console.error('Failed to load documents:', error);
+      this.documents = [];
     }
-    
-    const allObjects = await response.json();
-    console.log('Loaded all objects:', allObjects.length);
-    
-    // Transform each document without filtering
-    this.documents = [];
-    for (const obj of allObjects) {
-      try {
-        const transformed = this.transformDocument(obj);
-        this.documents.push(transformed);
-      } catch (error) {
-        console.error('Failed to transform:', obj.name, error);
-      }
-    }
-    
-    // Sort by date
-    this.documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    
-    console.log('Final documents array:', this.documents.length);
-    
-  } catch (error) {
-    console.error('Failed to load documents:', error);
-    this.documents = [];
   }
-}
 
   // Transform API object to document format
   transformDocument(obj) {
@@ -302,8 +281,8 @@ async loadDocuments() {
     title = title.replace(/[_-]/g, ' ').trim();
     
     // Try to extract area/topic from the name or properties
-    let area = 'Unknown';
-    let topic = 'Unknown';
+    let area = 'Documents';
+    let topic = 'General';
     
     // Check if name contains known areas/topics
     const areas = Object.keys(CONFIG.RESEARCH_TOPICS);
@@ -323,7 +302,7 @@ async loadDocuments() {
           break;
         }
       }
-      if (topic !== 'Unknown') break;
+      if (topic !== 'General') break;
     }
     
     // Use properties if available
@@ -357,19 +336,16 @@ async loadDocuments() {
     }
   }
 
-  // Filter and render documents
+  // Filter and render documents - Show all, only filter by search
   filterAndRenderDocuments() {
     this.filteredDocuments = this.documents.filter(doc => {
-      // Filter by category
-      const matchesFilter = this.currentFilter === 'All' || doc.area === this.currentFilter;
-      
-      // Filter by search query
+      // Only filter by search query, ignore area filters
       const matchesSearch = !this.searchQuery || 
         [doc.title, doc.area, doc.topic].some(field => 
           field && field.toLowerCase().includes(this.searchQuery)
         );
       
-      return matchesFilter && matchesSearch;
+      return matchesSearch;
     });
     
     this.renderDocuments();
@@ -384,7 +360,7 @@ async loadDocuments() {
     }
     
     if (this.filteredDocuments.length === 0) {
-      docsPane.innerHTML = '<div class="empty">No documents match your filters.</div>';
+      docsPane.innerHTML = '<div class="empty">No documents found.</div>';
       return;
     }
     
