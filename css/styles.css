@@ -545,3 +545,27 @@ dialog::backdrop {
   .shell{grid-template-columns:1fr}
   .right{display:none}
 }
+/* Fix right panel scrolling */
+.right {
+  background: var(--soft);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent scrolling */
+}
+
+.console {
+  padding: 14px 16px;
+  overflow: visible; /* Don't scroll the form */
+  flex: 1;
+}
+
+/* Style for generate button row */
+.generate-row {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.generate-row .btn {
+  min-width: 120px;
+}
