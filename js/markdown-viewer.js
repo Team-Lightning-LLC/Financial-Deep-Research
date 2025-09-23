@@ -238,3 +238,51 @@ class MarkdownViewer {
 
 // Create global instance
 const markdownViewer = new MarkdownViewer();
+// Generate PDF from markdown content directly
+async generatePDFFromContent(markdownContent, title) {
+  if (!markdownContent) {
+    console.error('No content provided for PDF generation');
+    return;
+  }
+
+  if (!window.html2pdf) {
+    console.error('html2pdf library not loaded');
+    return;
+  }
+
+  try {
+    // Convert markdown to HTML
+    const htmlContent = marked.parse(markdownContent);
+    
+    // Create temporary container
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    
+    // Apply inline styles for PDF
+    this.applyInlineStyles(tempDiv);
+    
+    // Add to DOM temporarily
+    document.body.appendChild(tempDiv);
+    
+    // Generate filename
+    const filename = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    
+    // Configure PDF options
+    const pdfOptions = {
+      margin: 0.5,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    // Generate and download PDF
+    await html2pdf().set(pdfOptions).from(tempDiv).save();
+    
+    // Clean up
+    document.body.removeChild(tempDiv);
+    
+  } catch (error) {
+    console.error('PDF generation failed:', error);
+  }
+}
