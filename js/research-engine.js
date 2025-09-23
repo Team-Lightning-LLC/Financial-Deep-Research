@@ -4,6 +4,7 @@ class ResearchEngine {
     this.currentJob = null;
     this.countdownTimer = null;
     this.refreshTimer = null;
+    this.isMinimized = false;
     this.setupEventListeners();
   }
 
@@ -12,6 +13,29 @@ class ResearchEngine {
     document.getElementById('toastClose')?.addEventListener('click', () => {
       this.cancelResearch();
     });
+
+    // Toast minimize button
+    document.getElementById('toastMinimize')?.addEventListener('click', () => {
+      this.toggleMinimize();
+    });
+  }
+
+  // Toggle minimize state
+  toggleMinimize() {
+    const toast = document.getElementById('generationToast');
+    const minimizeBtn = document.getElementById('toastMinimize');
+    
+    this.isMinimized = !this.isMinimized;
+    
+    if (this.isMinimized) {
+      toast.classList.add('minimized');
+      minimizeBtn.textContent = '+';
+      minimizeBtn.title = 'Expand';
+    } else {
+      toast.classList.remove('minimized');
+      minimizeBtn.textContent = '−';
+      minimizeBtn.title = 'Minimize';
+    }
   }
 
   // Start research generation
@@ -40,7 +64,7 @@ class ResearchEngine {
       // Start periodic refresh after 7 minutes
       setTimeout(() => {
         this.startPeriodicRefresh();
-      }, 7 * 60 * 1000); // 7 minutes
+      }, 7 * 60 * 1000);
 
     } catch (error) {
       console.error('Failed to start research:', error);
@@ -53,25 +77,32 @@ class ResearchEngine {
     return `${researchData.topic}: Depth - ${researchData.params.depth}, Rigor - ${researchData.params.rigor}, Focus - ${researchData.params.focus}`;
   }
 
-// Show generation progress toast
-showGenerationProgress() {
-  const toast = document.getElementById('generationToast');
-  const title = toast.querySelector('.toast-title');
-  const subtitle = toast.querySelector('.toast-subtitle');
-  
-  // Build descriptive title with research details
-  const researchTitle = `Generating ${this.currentJob.data.topic} Research...`;
-  const researchDetails = `${this.currentJob.data.params.depth} • ${this.currentJob.data.params.rigor} • ${this.currentJob.data.params.focus}`;
-  
-  if (title) title.textContent = researchTitle;
-  if (subtitle) subtitle.innerHTML = `${researchDetails}<br>Estimated time: <span id="timeRemaining">5:00</span>`;
-  
-  toast.style.display = 'block';
-}
+  // Show generation progress toast
+  showGenerationProgress() {
+    const toast = document.getElementById('generationToast');
+    const title = toast.querySelector('.toast-title');
+    const subtitle = toast.querySelector('.toast-subtitle');
+    const details = toast.querySelector('.toast-details');
+    
+    // Build descriptive content
+    const researchTitle = `Generating ${this.currentJob.data.topic}`;
+    const researchDetails = `${this.currentJob.data.params.depth} • ${this.currentJob.data.params.rigor} • ${this.currentJob.data.params.focus}`;
+    
+    if (title) title.textContent = researchTitle;
+    if (subtitle) subtitle.innerHTML = `Estimated time: <span id="timeRemaining">5:00</span>`;
+    if (details) details.textContent = researchDetails;
+    
+    // Reset minimize state
+    this.isMinimized = false;
+    toast.classList.remove('minimized');
+    document.getElementById('toastMinimize').textContent = '−';
+    
+    toast.style.display = 'block';
+  }
 
   // Start countdown timer
   startCountdownTimer() {
-    let timeLeft = CONFIG.GENERATION.ESTIMATED_TIME_MINUTES * 60; // seconds
+    let timeLeft = CONFIG.GENERATION.ESTIMATED_TIME_MINUTES * 60;
     
     this.countdownTimer = setInterval(() => {
       const minutes = Math.floor(timeLeft / 60);
@@ -87,7 +118,7 @@ showGenerationProgress() {
         clearInterval(this.countdownTimer);
         const subtitle = document.querySelector('.toast-subtitle');
         if (subtitle) {
-          subtitle.textContent = 'Research in progress... We\'ll refresh your library periodically.';
+          subtitle.textContent = 'Finalizing research...';
         }
       }
       
@@ -95,31 +126,34 @@ showGenerationProgress() {
     }, 1000);
   }
 
- // Start periodic refresh of document library
-startPeriodicRefresh() {
-  console.log('Starting periodic refresh of document library...');
-  
-  // Refresh immediately
-  this.refreshDocumentLibrary();
-  
-  // Then refresh every 7 minutes
-  this.refreshTimer = setInterval(() => {
+  // Start periodic refresh of document library
+  startPeriodicRefresh() {
+    console.log('Starting periodic refresh of document library...');
+    
+    // Refresh immediately
     this.refreshDocumentLibrary();
-  }, 7 * 60 * 1000); // 7 minutes
-  
-  // Update toast to show periodic refresh mode with research context
-  const title = document.querySelector('.toast-title');
-  const subtitle = document.querySelector('.toast-subtitle');
-  const researchTitle = `${this.currentJob.data.topic} Research In Progress`;
-  
-  if (title) title.textContent = researchTitle;
-  if (subtitle) subtitle.textContent = 'Checking for completion every 7 minutes...';
-  
-  // Auto-hide toast after 10 more seconds in this mode
-  setTimeout(() => {
-    this.hideToast();
-  }, 10000);
-}
+    
+    // Then refresh every 7 minutes
+    this.refreshTimer = setInterval(() => {
+      this.refreshDocumentLibrary();
+    }, 7 * 60 * 1000);
+    
+    // Update toast content for refresh mode
+    const title = document.querySelector('.toast-title');
+    const subtitle = document.querySelector('.toast-subtitle');
+    const details = document.querySelector('.toast-details');
+    
+    if (title) title.textContent = `${this.currentJob.data.topic} In Progress`;
+    if (subtitle) subtitle.textContent = 'Checking every 7 minutes...';
+    if (details) details.textContent = 'You can continue using the interface normally.';
+    
+    // Auto-minimize after 10 seconds to get out of the way
+    setTimeout(() => {
+      if (!this.isMinimized) {
+        this.toggleMinimize();
+      }
+    }, 10000);
+  }
 
   // Refresh the document library
   async refreshDocumentLibrary() {
@@ -130,7 +164,6 @@ startPeriodicRefresh() {
         await window.app.refreshDocuments();
         const newCount = window.app.documents.length;
         
-        // If we found new documents, show completion
         if (newCount > previousCount) {
           console.log(`Found ${newCount - previousCount} new documents!`);
           this.handleNewDocuments();
@@ -141,30 +174,36 @@ startPeriodicRefresh() {
     }
   }
 
- // Handle when new documents are found
-handleNewDocuments() {
-  // Show brief completion notification with research context
-  const toast = document.getElementById('generationToast');
-  const title = toast.querySelector('.toast-title');
-  const subtitle = toast.querySelector('.toast-subtitle');
-  const spinner = document.querySelector('.toast-spinner');
-  
-  const completionTitle = `${this.currentJob.data.topic} Research Complete!`;
-  
-  if (title) title.textContent = completionTitle;
-  if (subtitle) subtitle.textContent = 'Your document library has been updated.';
-  if (spinner) spinner.style.display = 'none';
-  
-  toast.style.display = 'block';
-  
-  // Hide after 3 seconds
-  setTimeout(() => {
-    this.finishResearch();
-  }, 3000);
-}
+  // Handle when new documents are found
+  handleNewDocuments() {
+    const toast = document.getElementById('generationToast');
+    const title = toast.querySelector('.toast-title');
+    const subtitle = toast.querySelector('.toast-subtitle');
+    const details = toast.querySelector('.toast-details');
+    const spinner = document.querySelector('.toast-spinner');
+    
+    const completionTitle = `${this.currentJob.data.topic} Complete!`;
+    
+    if (title) title.textContent = completionTitle;
+    if (subtitle) subtitle.textContent = 'Ready to view';
+    if (details) details.textContent = 'Your document library has been updated.';
+    if (spinner) spinner.style.display = 'none';
+    
+    // Expand if minimized to show completion
+    if (this.isMinimized) {
+      this.toggleMinimize();
+    }
+    
+    toast.style.display = 'block';
+    
+    // Hide after 4 seconds
+    setTimeout(() => {
+      this.finishResearch();
+    }, 4000);
+  }
+
   // Finish research and cleanup
   finishResearch() {
-    // Clear all timers
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
       this.refreshTimer = null;
@@ -178,6 +217,7 @@ handleNewDocuments() {
     this.hideToast();
     this.resetForm();
     this.currentJob = null;
+    this.isMinimized = false;
   }
 
   // Cancel current research
@@ -195,20 +235,24 @@ handleNewDocuments() {
     this.hideToast();
     this.resetForm();
     this.currentJob = null;
+    this.isMinimized = false;
   }
 
   // Hide generation toast
   hideToast() {
     const toast = document.getElementById('generationToast');
     toast.style.display = 'none';
+    toast.classList.remove('minimized');
     
     // Reset toast content
     const title = toast.querySelector('.toast-title');
     const subtitle = toast.querySelector('.toast-subtitle');
-    const spinner = toast.querySelector('.toast-spinner');
+    const details = toast.querySelector('.toast-details');
+    const spinner = document.querySelector('.toast-spinner');
     
     if (title) title.textContent = 'Generating Research...';
     if (subtitle) subtitle.innerHTML = `Estimated time: <span id="timeRemaining">5:00</span>`;
+    if (details) details.textContent = '';
     if (spinner) spinner.style.display = 'block';
   }
 
