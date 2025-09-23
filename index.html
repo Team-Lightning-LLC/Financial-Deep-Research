@@ -1,5 +1,3 @@
-## index.html
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,6 +48,7 @@
           <button class="chip" data-filter="Markets">Markets</button>
           <button class="chip" data-filter="Sectors">Sectors</button>
           <button class="chip" data-filter="Assets">Assets</button>
+          <button class="chip" data-filter="Concepts">Concepts</button>
         </div>
       </div>
       <div class="left-body">
@@ -123,15 +122,21 @@
     </main>
   </section>
 
-<!-- Generation Progress Toast -->
+<!-- Generation Progress Toast - Collapsible -->
 <div id="generationToast" class="toast-notification">
-  <div class="toast-content">
-    <div class="toast-spinner"></div>
-    <div class="toast-text">
+  <div class="toast-header">
+    <div class="toast-icon">
+      <div class="toast-spinner"></div>
+    </div>
+    <div class="toast-title-section">
       <div class="toast-title">Generating Research...</div>
       <div class="toast-subtitle">Estimated time: <span id="timeRemaining">5:00</span></div>
     </div>
+    <button class="toast-minimize" id="toastMinimize">−</button>
     <button class="toast-close" id="toastClose">×</button>
+  </div>
+  <div class="toast-body" id="toastBody">
+    <div class="toast-details"></div>
   </div>
 </div>
 
