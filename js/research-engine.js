@@ -2,8 +2,8 @@
 class ResearchEngine {
   constructor() {
     this.currentJob = null;
-    this.pollingTimer = null;
     this.countdownTimer = null;
+    this.refreshTimer = null;
     this.setupEventListeners();
   }
 
@@ -20,7 +20,7 @@ class ResearchEngine {
       // Build research prompt
       const prompt = this.buildResearchPrompt(researchData);
       
-      // Execute async research - only send Task
+      // Execute async research
       const jobResponse = await vertesiaAPI.executeAsync({
         Task: prompt
       });
@@ -37,10 +37,10 @@ class ResearchEngine {
       // Start countdown timer
       this.startCountdownTimer();
       
-      // Start polling after estimated time
+      // Start periodic refresh after 7 minutes
       setTimeout(() => {
-        this.startPolling();
-      }, CONFIG.GENERATION.POLLING_START_DELAY_MS);
+        this.startPeriodicRefresh();
+      }, 7 * 60 * 1000); // 7 minutes
 
     } catch (error) {
       console.error('Failed to start research:', error);
@@ -53,17 +53,21 @@ class ResearchEngine {
     return `${researchData.topic}: Depth - ${researchData.params.depth}, Rigor - ${researchData.params.rigor}, Focus - ${researchData.params.focus}`;
   }
 
-  // Show generation progress toast
-  showGenerationProgress() {
-    const toast = document.getElementById('generationToast');
-    const title = toast.querySelector('.toast-title');
-    const subtitle = toast.querySelector('.toast-subtitle');
-    
-    if (title) title.textContent = 'Generating Research...';
-    if (subtitle) subtitle.innerHTML = `Estimated time: <span id="timeRemaining">5:00</span>`;
-    
-    toast.style.display = 'block';
-  }
+// Show generation progress toast
+showGenerationProgress() {
+  const toast = document.getElementById('generationToast');
+  const title = toast.querySelector('.toast-title');
+  const subtitle = toast.querySelector('.toast-subtitle');
+  
+  // Build descriptive title with research details
+  const researchTitle = `Generating ${this.currentJob.data.topic} Research...`;
+  const researchDetails = `${this.currentJob.data.params.depth} • ${this.currentJob.data.params.rigor} • ${this.currentJob.data.params.focus}`;
+  
+  if (title) title.textContent = researchTitle;
+  if (subtitle) subtitle.innerHTML = `${researchDetails}<br>Estimated time: <span id="timeRemaining">5:00</span>`;
+  
+  toast.style.display = 'block';
+}
 
   // Start countdown timer
   startCountdownTimer() {
@@ -83,7 +87,7 @@ class ResearchEngine {
         clearInterval(this.countdownTimer);
         const subtitle = document.querySelector('.toast-subtitle');
         if (subtitle) {
-          subtitle.textContent = 'Finalizing research...';
+          subtitle.textContent = 'Research in progress... We\'ll refresh your library periodically.';
         }
       }
       
@@ -91,89 +95,79 @@ class ResearchEngine {
     }, 1000);
   }
 
-  // Start polling for completion
-  async startPolling() {
-    if (!this.currentJob) return;
-    
-    let attempts = 0;
-    const maxAttempts = CONFIG.GENERATION.MAX_POLLING_ATTEMPTS;
-    
-    this.pollingTimer = setInterval(async () => {
-      try {
-        attempts++;
-        
-        if (attempts > maxAttempts) {
-          this.showError('Research generation timed out. Please try again.');
-          this.cancelResearch();
-          return;
-        }
+ // Start periodic refresh of document library
+startPeriodicRefresh() {
+  console.log('Starting periodic refresh of document library...');
+  
+  // Refresh immediately
+  this.refreshDocumentLibrary();
+  
+  // Then refresh every 7 minutes
+  this.refreshTimer = setInterval(() => {
+    this.refreshDocumentLibrary();
+  }, 7 * 60 * 1000); // 7 minutes
+  
+  // Update toast to show periodic refresh mode with research context
+  const title = document.querySelector('.toast-title');
+  const subtitle = document.querySelector('.toast-subtitle');
+  const researchTitle = `${this.currentJob.data.topic} Research In Progress`;
+  
+  if (title) title.textContent = researchTitle;
+  if (subtitle) subtitle.textContent = 'Checking for completion every 7 minutes...';
+  
+  // Auto-hide toast after 10 more seconds in this mode
+  setTimeout(() => {
+    this.hideToast();
+  }, 10000);
+}
 
-        // Check if research document was created
-        const completed = await this.checkForCompletion();
-        
-        if (completed) {
-          await this.handleCompletion(completed);
-          this.finishResearch();
-        }
-        
-      } catch (error) {
-        console.error('Polling error:', error);
-        if (attempts > 3) { // Give a few tries before failing
-          this.showError('Failed to check research status.');
-          this.cancelResearch();
-        }
-      }
-    }, CONFIG.GENERATION.POLLING_INTERVAL_MS);
-  }
-
-  // Check for research completion by looking for new documents
-  async checkForCompletion() {
+  // Refresh the document library
+  async refreshDocumentLibrary() {
+    console.log('Refreshing document library...');
     try {
-      const objects = await vertesiaAPI.loadAllObjects();
-      
-      // Look for documents created after job start time
-      const recentDocs = objects.filter(obj => {
-        const isResearchDoc = obj.name?.includes(CONFIG.DOCUMENTS.PREFIX);
-        const createdAfter = new Date(obj.created_at) > new Date(this.currentJob.startTime);
-        return isResearchDoc && createdAfter;
-      });
-
-      // Return the most recent one
-      return recentDocs.length > 0 ? recentDocs[0] : null;
-    } catch (error) {
-      console.error('Error checking completion:', error);
-      return null;
-    }
-  }
-
-  // Handle research completion
-  async handleCompletion(completedDoc) {
-    try {
-      // Update toast
-      const title = document.querySelector('.toast-title');
-      const subtitle = document.querySelector('.toast-subtitle');
-      const spinner = document.querySelector('.toast-spinner');
-      
-      if (title) title.textContent = 'Research Complete!';
-      if (subtitle) subtitle.textContent = 'Your document is ready to view.';
-      if (spinner) spinner.style.display = 'none';
-      
-      // Refresh document library
       if (window.app) {
+        const previousCount = window.app.documents.length;
         await window.app.refreshDocuments();
+        const newCount = window.app.documents.length;
+        
+        // If we found new documents, show completion
+        if (newCount > previousCount) {
+          console.log(`Found ${newCount - previousCount} new documents!`);
+          this.handleNewDocuments();
+        }
       }
-      
     } catch (error) {
-      console.error('Error handling completion:', error);
+      console.error('Error refreshing document library:', error);
     }
   }
 
+ // Handle when new documents are found
+handleNewDocuments() {
+  // Show brief completion notification with research context
+  const toast = document.getElementById('generationToast');
+  const title = toast.querySelector('.toast-title');
+  const subtitle = toast.querySelector('.toast-subtitle');
+  const spinner = document.querySelector('.toast-spinner');
+  
+  const completionTitle = `${this.currentJob.data.topic} Research Complete!`;
+  
+  if (title) title.textContent = completionTitle;
+  if (subtitle) subtitle.textContent = 'Your document library has been updated.';
+  if (spinner) spinner.style.display = 'none';
+  
+  toast.style.display = 'block';
+  
+  // Hide after 3 seconds
+  setTimeout(() => {
+    this.finishResearch();
+  }, 3000);
+}
   // Finish research and cleanup
   finishResearch() {
-    // Clear timers
-    if (this.pollingTimer) {
-      clearInterval(this.pollingTimer);
-      this.pollingTimer = null;
+    // Clear all timers
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
     }
     
     if (this.countdownTimer) {
@@ -181,20 +175,16 @@ class ResearchEngine {
       this.countdownTimer = null;
     }
     
-    // Hide toast after delay
-    setTimeout(() => {
-      this.hideToast();
-      this.resetForm();
-    }, 3000);
-    
+    this.hideToast();
+    this.resetForm();
     this.currentJob = null;
   }
 
   // Cancel current research
   cancelResearch() {
-    if (this.pollingTimer) {
-      clearInterval(this.pollingTimer);
-      this.pollingTimer = null;
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
     }
     
     if (this.countdownTimer) {
@@ -238,7 +228,6 @@ class ResearchEngine {
 
   // Show error message
   showError(message) {
-    // Could enhance this with a proper error toast
     console.error(message);
     alert(message);
   }
