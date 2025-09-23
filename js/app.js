@@ -118,6 +118,8 @@ class DeepResearchApp {
       
       if (action.classList.contains('view-action')) {
         await this.viewDocument(docId);
+      } else if (action.classList.contains('download-action')) {
+        await this.downloadDocument(docId);
       } else if (action.classList.contains('delete-action')) {
         await this.deleteDocument(docId);
       }
@@ -224,7 +226,7 @@ class DeepResearchApp {
     try {
       console.log('Loading documents...');
       
-      // Direct API call like your working example
+      // Direct API call
       const response = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects?limit=1000&offset=0`, {
         method: 'GET',
         headers: {
@@ -240,13 +242,9 @@ class DeepResearchApp {
       const allObjects = await response.json();
       console.log('Loaded objects:', allObjects.length);
       
-      // Debug: Show first few object names
-      console.log('First 5 object names:', allObjects.slice(0, 5).map(obj => obj.name));
-      
       // Filter for documents containing "Deep Research" in any format
       const researchDocs = allObjects.filter(obj => {
         if (!obj.name) {
-          console.log('Object without name:', obj.id);
           return false;
         }
         
@@ -255,18 +253,10 @@ class DeepResearchApp {
         const hasResearch = name.includes('research');
         const hasDeepResearch = hasDeep && hasResearch;
         
-        console.log(`Checking "${obj.name}":`, {
-          hasDeep,
-          hasResearch,
-          hasDeepResearch,
-          status: obj.status
-        });
-        
         return hasDeepResearch;
       });
       
       console.log('Filtered research docs:', researchDocs.length);
-      researchDocs.forEach(doc => console.log('  - Found:', doc.name));
       
       // Transform each document
       this.documents = [];
@@ -274,7 +264,6 @@ class DeepResearchApp {
         try {
           const transformed = this.transformDocument(obj);
           this.documents.push(transformed);
-          console.log('Transformed:', transformed.title);
         } catch (error) {
           console.error('Failed to transform:', obj.name, error);
         }
@@ -284,7 +273,6 @@ class DeepResearchApp {
       this.documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
       console.log('Final documents array:', this.documents.length);
-      console.log('Document titles:', this.documents.map(d => d.title));
       
     } catch (error) {
       console.error('Failed to load documents:', error);
@@ -294,8 +282,6 @@ class DeepResearchApp {
 
   // Transform API object to document format
   transformDocument(obj) {
-    console.log('Transforming document:', obj.name);
-    
     // Clean up the title - remove common prefixes and make readable
     let title = obj.name || 'Untitled';
     
@@ -311,7 +297,6 @@ class DeepResearchApp {
     title = title.replace(/[_-]/g, ' ').trim();
     
     // Try to extract area/topic from the name or properties
-    const nameParts = title.toLowerCase().split(' ');
     let area = 'Unknown';
     let topic = 'Unknown';
     
@@ -340,19 +325,15 @@ class DeepResearchApp {
     area = obj.properties?.research_area || area;
     topic = obj.properties?.research_topic || topic;
     
-    const transformed = {
+    return {
       id: obj.id,
       title: title,
       area: area,
       topic: topic,
       created_at: obj.created_at || obj.properties?.generated_at || new Date().toISOString(),
       content_source: obj.content?.source,
-      pages: obj.properties?.page_count || Math.floor(Math.random() * 15) + 5,
       when: this.formatDate(obj.created_at || obj.properties?.generated_at)
     };
-    
-    console.log('Transformed result:', transformed);
-    return transformed;
   }
 
   // Format date for display
@@ -373,12 +354,6 @@ class DeepResearchApp {
 
   // Filter and render documents
   filterAndRenderDocuments() {
-    console.log('Filtering documents:', {
-      totalDocs: this.documents.length,
-      currentFilter: this.currentFilter,
-      searchQuery: this.searchQuery
-    });
-    
     this.filteredDocuments = this.documents.filter(doc => {
       // Filter by category
       const matchesFilter = this.currentFilter === 'All' || doc.area === this.currentFilter;
@@ -389,26 +364,13 @@ class DeepResearchApp {
           field && field.toLowerCase().includes(this.searchQuery)
         );
       
-      const passes = matchesFilter && matchesSearch;
-      
-      if (!passes) {
-        console.log(`Filtered out "${doc.title}":`, {
-          matchesFilter,
-          matchesSearch,
-          area: doc.area,
-          currentFilter: this.currentFilter
-        });
-      }
-      
-      return passes;
+      return matchesFilter && matchesSearch;
     });
-    
-    console.log('After filtering:', this.filteredDocuments.length, 'documents remain');
     
     this.renderDocuments();
   }
 
-  // Render document list
+  // Render document list - Updated without page counts, with download
   renderDocuments() {
     const docsPane = document.getElementById('docsPane');
     if (!docsPane) {
@@ -416,37 +378,26 @@ class DeepResearchApp {
       return;
     }
     
-    console.log('Rendering documents:', {
-      totalDocs: this.documents.length,
-      filteredDocs: this.filteredDocuments.length,
-      currentFilter: this.currentFilter,
-      searchQuery: this.searchQuery
-    });
-    
     if (this.filteredDocuments.length === 0) {
-      console.log('No documents to show');
       docsPane.innerHTML = '<div class="empty">No documents match your filters.</div>';
       return;
     }
     
-    const html = this.filteredDocuments.map(doc => {
-      console.log('Rendering doc:', doc.title);
-      return `
-        <div class="doc" data-doc-id="${doc.id}">
-          <div class="doc-info">
-            <div class="tt">${doc.title}</div>
-            <div class="meta">${doc.when} • ${doc.area} • ${doc.topic} • ${doc.pages} pages</div>
-          </div>
-          <div class="actions">
-            <button class="doc-action view-action">view</button>
-            <button class="doc-action delete-action">delete</button>
-          </div>
+    const html = this.filteredDocuments.map(doc => `
+      <div class="doc" data-doc-id="${doc.id}">
+        <div class="doc-info">
+          <div class="tt">${doc.title}</div>
+          <div class="meta">${doc.when} • ${doc.area} • ${doc.topic}</div>
         </div>
-      `;
-    }).join('');
+        <div class="actions">
+          <button class="doc-action view-action">view</button>
+          <button class="doc-action download-action">download</button>
+          <button class="doc-action delete-action">delete</button>
+        </div>
+      </div>
+    `).join('');
     
     docsPane.innerHTML = html;
-    console.log('Rendered HTML to DOM');
   }
 
   // View document
@@ -455,9 +406,7 @@ class DeepResearchApp {
       const doc = this.documents.find(d => d.id === docId);
       if (!doc) return;
       
-      console.log('Viewing document:', doc.title, 'Source:', doc.content_source);
-      
-      // Get document content using the same pattern as your working code
+      // Get document content
       const downloadResponse = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects/download-url`, {
         method: 'POST',
         headers: {
@@ -490,6 +439,50 @@ class DeepResearchApp {
     } catch (error) {
       console.error('Failed to view document:', error);
       alert('Failed to load document. Please try again.');
+    }
+  }
+
+  // Download document as PDF
+  async downloadDocument(docId) {
+    try {
+      const doc = this.documents.find(d => d.id === docId);
+      if (!doc) return;
+      
+      console.log('Downloading document:', doc.title);
+      
+      // Get document content
+      const downloadResponse = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects/download-url`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          file: doc.content_source,
+          format: 'original'
+        })
+      });
+      
+      if (!downloadResponse.ok) {
+        throw new Error(`Failed to get download URL: ${downloadResponse.statusText}`);
+      }
+      
+      const downloadData = await downloadResponse.json();
+      
+      // Fetch the content
+      const contentResponse = await fetch(downloadData.url);
+      if (!contentResponse.ok) {
+        throw new Error(`Failed to download content: ${contentResponse.statusText}`);
+      }
+      
+      const content = await contentResponse.text();
+      
+      // Generate PDF using the markdown viewer
+      await markdownViewer.generatePDFFromContent(content, doc.title);
+      
+    } catch (error) {
+      console.error('Failed to download document:', error);
+      alert('Failed to download document. Please try again.');
     }
   }
 
