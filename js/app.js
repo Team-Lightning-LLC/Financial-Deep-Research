@@ -242,43 +242,48 @@ class DeepResearchApp {
       const allObjects = await response.json();
       console.log('Loaded objects:', allObjects.length);
       
-      // Filter for documents containing "Deep Research" in any format
-      const researchDocs = allObjects.filter(obj => {
-        if (!obj.name) {
-          return false;
-        }
-        
-        const name = obj.name.toLowerCase();
-        const hasDeep = name.includes('deep');
-        const hasResearch = name.includes('research');
-        const hasDeepResearch = hasDeep && hasResearch;
-        
-        return hasDeepResearch;
-      });
-      
-      console.log('Filtered research docs:', researchDocs.length);
-      
-      // Transform each document
-      this.documents = [];
-      for (const obj of researchDocs) {
-        try {
-          const transformed = this.transformDocument(obj);
-          this.documents.push(transformed);
-        } catch (error) {
-          console.error('Failed to transform:', obj.name, error);
-        }
+// Load all documents from API - no filtering
+async loadDocuments() {
+  try {
+    console.log('Loading all documents...');
+    
+    // Direct API call
+    const response = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects?limit=1000&offset=0`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
+        'Content-Type': 'application/json'
       }
-      
-      // Sort by date
-      this.documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      
-      console.log('Final documents array:', this.documents.length);
-      
-    } catch (error) {
-      console.error('Failed to load documents:', error);
-      this.documents = [];
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
     }
+    
+    const allObjects = await response.json();
+    console.log('Loaded all objects:', allObjects.length);
+    
+    // Transform each document without filtering
+    this.documents = [];
+    for (const obj of allObjects) {
+      try {
+        const transformed = this.transformDocument(obj);
+        this.documents.push(transformed);
+      } catch (error) {
+        console.error('Failed to transform:', obj.name, error);
+      }
+    }
+    
+    // Sort by date
+    this.documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    console.log('Final documents array:', this.documents.length);
+    
+  } catch (error) {
+    console.error('Failed to load documents:', error);
+    this.documents = [];
   }
+}
 
   // Transform API object to document format
   transformDocument(obj) {
